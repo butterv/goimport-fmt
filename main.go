@@ -143,16 +143,6 @@ func main() {
 		}
 
 		if packageTyape == Unknown {
-			isThirdParty, err := isThirdPartyPackage(p)
-			if err != nil {
-				fmt.Printf("err: %s\n", err.Error())
-			}
-			if isThirdParty {
-				packageTyape = ThirdParty
-			}
-		}
-
-		if packageTyape == Unknown {
 			isOwnProject, err := isOwnProjectPackage(p)
 			if err != nil {
 				fmt.Printf("err: %s\n", err.Error())
@@ -162,12 +152,16 @@ func main() {
 			}
 		}
 
+		if packageTyape == Unknown {
+			packageTyape = ThirdParty
+		}
+
 		fmt.Printf("%s(%s)\n", p, packageTyape)
 	}
 }
 
 func isStandardPackage(path string) (bool, error) {
-	p := fmt.Sprintf("%s/src/%s", Env.GOROOT, strings.Trim(path, "\""))
+	p := fmt.Sprintf("%s/src/%s", Env.GOROOT, path)
 	//fmt.Printf("path: %s\n", p)
 
 	_, err := os.Stat(p)
@@ -182,7 +176,7 @@ func isStandardPackage(path string) (bool, error) {
 }
 
 func isThirdPartyPackage(path string) (bool, error) {
-	p := fmt.Sprintf("%s/pkg/mod/%s", Env.GOPATH, strings.Trim(path, "\""))
+	p := fmt.Sprintf("%s/pkg/mod/%s", Env.GOPATH, path)
 	//fmt.Printf("path: %s\n", p)
 
 	_, err := os.Stat(p)
@@ -197,7 +191,7 @@ func isThirdPartyPackage(path string) (bool, error) {
 }
 
 func isOwnProjectPackage(path string) (bool, error) {
-	p := fmt.Sprintf("%s/src/%s", Env.GOPATH, strings.Trim(path, "\""))
+	p := fmt.Sprintf("%s/src/%s", Env.GOPATH, path)
 	//fmt.Printf("path: %s\n", p)
 
 	_, err := os.Stat(p)
