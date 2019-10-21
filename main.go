@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -118,7 +119,7 @@ func main() {
 		fmt.Printf("%s\n", path)
 	}
 
-	fmt.Println("## After")
+	fmt.Println("## After1")
 
 	fset := token.NewFileSet()
 	fp, err := parser.ParseFile(fset, path, nil, parser.Mode(0))
@@ -153,10 +154,56 @@ func main() {
 		}
 
 		if packageTyape == Unknown {
+			// StandardでもOwnProjectでもなければThirdPartyとする
 			packageTyape = ThirdParty
 		}
 
 		fmt.Printf("%s(%s)\n", p, packageTyape)
+	}
+
+	fmt.Println()
+	fmt.Println("## After2")
+
+	fset2 := token.NewFileSet()
+	fp2, err := parser.ParseFile(fset2, path, nil, parser.Mode(0))
+	if err != nil {
+		panic(err.Error())
+	}
+	ast.SortImports(fset2, fp2)
+	fp3, err := parser.ParseFile(fset2, path, nil, parser.Mode(0))
+	if err != nil {
+		panic(err.Error())
+	}
+	for _, d := range fp3.Imports {
+
+		var packageTyape = Unknown
+
+		{
+			isStandard, err := isStandardPackage(d.Path.Value)
+			if err != nil {
+				fmt.Printf("err: %s\n", err.Error())
+			}
+			if isStandard {
+				packageTyape = Standard
+			}
+		}
+
+		if packageTyape == Unknown {
+			isOwnProject, err := isOwnProjectPackage(d.Path.Value)
+			if err != nil {
+				fmt.Printf("err: %s\n", err.Error())
+			}
+			if isOwnProject {
+				packageTyape = OwnProject
+			}
+		}
+
+		if packageTyape == Unknown {
+			// StandardでもOwnProjectでもなければThirdPartyとする
+			packageTyape = ThirdParty
+		}
+
+		fmt.Printf("%s(%s)\n", d.Path.Value, packageTyape)
 	}
 }
 
