@@ -44,10 +44,38 @@ func main() {
 	scanner := bufio.NewScanner(f)
 
 	// 行数
-	l := 0
+	var line, importStart, importEnd uint
+	// importの各行
+	var importLines []string
+	// import開始フラグ
+	var importFlag bool
 	for scanner.Scan() {
-		l++
+		line++
+		// その行の内容
+		lineStr := scanner.Text()
 		// ここで一行ずつ処理
-		fmt.Printf("L%d: %s\n", l, scanner.Text())
+		//fmt.Printf("L%d: %s\n", line, lineStr)
+
+		if !importFlag && lineStr == "import (" {
+			// import部分の読み込み開始
+			importFlag = true
+			importStart = line
+		}
+
+		if importFlag {
+			importLines = append(importLines, lineStr)
+		}
+
+		if importFlag && lineStr == ")" {
+			// import部分の読み込み終了
+			importFlag = false
+			importEnd = line
+			break
+		}
+	}
+
+	fmt.Printf("start: %d, end: %d\n", importStart, importEnd)
+	for _, importLine := range importLines {
+		fmt.Printf("%s\n", importLine)
 	}
 }
