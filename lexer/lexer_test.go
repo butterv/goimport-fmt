@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/istsh/goimport-fmt/config"
 )
 
 type PackageType string
@@ -22,25 +24,25 @@ type ImportDetail struct {
 	PackageType PackageType
 }
 
-type Environment struct {
-	GOROOT      string
-	GOPATH      string
-	GO111MODULE string
-}
-
-var Env *Environment
-
-func setup() {
-	goroot := os.Getenv("GOROOT")
-	gopath := os.Getenv("GOPATH")
-	go111module := os.Getenv("GO111MODULE")
-
-	Env = &Environment{
-		GOROOT:      goroot,
-		GOPATH:      gopath,
-		GO111MODULE: go111module,
-	}
-}
+//type Environment struct {
+//	GOROOT      string
+//	GOPATH      string
+//	GO111MODULE string
+//}
+//
+//var Env *Environment
+//
+//func setup() {
+//	goroot := os.Getenv("GOROOT")
+//	gopath := os.Getenv("GOPATH")
+//	go111module := os.Getenv("GO111MODULE")
+//
+//	Env = &Environment{
+//		GOROOT:      goroot,
+//		GOPATH:      gopath,
+//		GO111MODULE: go111module,
+//	}
+//}
 
 func Test1(t *testing.T) {
 	input := `import (
@@ -134,7 +136,7 @@ func Test1(t *testing.T) {
 	// replacedStr := strings.Replace(input, "\"", "", -1)
 	// fmt.Printf(replacedStr)
 
-	setup()
+	// setup()
 
 	var importStrs []string
 	for _, str := range strings.Split(input, "\n") {
@@ -164,7 +166,7 @@ func Test1(t *testing.T) {
 		}
 
 		replacedStr := strings.Replace(importStr, "\"", "", -1)
-		//fmt.Printf("%s\n", replacedStr)
+		fmt.Printf("%s\n", replacedStr)
 
 		splitedStr := strings.Split(replacedStr, "\t")[1]
 		splitedStrs := strings.Split(splitedStr, " ")
@@ -219,7 +221,7 @@ func Test1(t *testing.T) {
 }
 
 func isStandardPackage(path string) (bool, error) {
-	p := fmt.Sprintf("%s/src/%s", Env.GOROOT, path)
+	p := fmt.Sprintf("%s/src/%s", config.GetEnv().GetGoRoot(), path)
 	//fmt.Printf("path: %s\n", p)
 
 	_, err := os.Stat(p)
@@ -234,7 +236,7 @@ func isStandardPackage(path string) (bool, error) {
 }
 
 func isOwnProjectPackage(path string) (bool, error) {
-	p := fmt.Sprintf("%s/src/%s", Env.GOPATH, path)
+	p := fmt.Sprintf("%s/src/%s", config.GetEnv().GetGoPath(), path)
 	//fmt.Printf("path: %s\n", p)
 
 	_, err := os.Stat(p)
