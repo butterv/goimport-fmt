@@ -2,11 +2,10 @@ package lexer
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
-	"github.com/istsh/goimport-fmt/config"
+	"github.com/istsh/goimport-fmt/ast"
 )
 
 type PackageType string
@@ -136,115 +135,25 @@ func Test1(t *testing.T) {
 	// replacedStr := strings.Replace(input, "\"", "", -1)
 	// fmt.Printf(replacedStr)
 
-	// setup()
+	//config.Setup()
 
-	var importStrs []string
+	var strs []string
 	for _, str := range strings.Split(input, "\n") {
-		// fmt.Printf("L%d: %s\n", i, str)
-		importStrs = append(importStrs, str)
+		strs = append(strs, str)
 	}
 
-	if len(importStrs) == 1 {
+	if len(strs) == 1 {
 		return
 	}
 
+	ids, err := ast.Analyze(strs)
+	if err != nil {
+		// TODO: error handling
+	}
+
 	fmt.Println("{")
-	for _, importStr := range importStrs {
-		// ここからが実装
-
-		id := &ImportDetail{
-			PackageType: Unknown,
-		}
-
-		if importStr == "import (" || importStr == ")" {
-			id.Alias = "<no alias>"
-			id.ImportStr = importStr
-			continue
-		}
-		if importStr == "" {
-			continue
-		}
-
-		replacedStr := strings.Replace(strings.Trim(importStr, "\t"), "\"", "", -1)
-		fmt.Printf("%s\n", replacedStr)
-
-		splitedStrs := strings.Split(replacedStr, " ")
-
-		if len(splitedStrs) == 2 {
-			id.Alias = splitedStrs[0]
-
-			str := splitedStrs[1]
-			id.ImportStr = str
-
-			isStandard, _ := isStandardPackage(str)
-			if isStandard {
-				id.PackageType = Standard
-			}
-
-			if id.PackageType == Unknown {
-				isOwnProject, _ := isOwnProjectPackage(str)
-				if isOwnProject {
-					id.PackageType = OwnProject
-				}
-			}
-
-			if id.PackageType == Unknown {
-				// StandardでもOwnProjectでもなければThirdPartyとする
-				id.PackageType = ThirdParty
-			}
-		} else {
-			id.Alias = "<no alias>"
-			id.ImportStr = splitedStrs[0]
-
-			isStandard, _ := isStandardPackage(splitedStrs[0])
-			if isStandard {
-				id.PackageType = Standard
-			}
-
-			if id.PackageType == Unknown {
-				isOwnProject, _ := isOwnProjectPackage(splitedStrs[0])
-				if isOwnProject {
-					id.PackageType = OwnProject
-				}
-			}
-
-			if id.PackageType == Unknown {
-				// StandardでもOwnProjectでもなければThirdPartyとする
-				id.PackageType = ThirdParty
-			}
-		}
-
+	for _, id := range ids {
 		fmt.Printf("\t{\n\t\tImportStr:   %s,\n\t\tAlias:       %s, \n\t\tPackageType: %s,\n\t},\n", id.ImportStr, id.Alias, id.PackageType)
 	}
 	fmt.Println("}")
-}
-
-func isStandardPackage(path string) (bool, error) {
-	p := fmt.Sprintf("%s/src/%s", config.GetEnv().GetGoRoot(), path)
-	//fmt.Printf("path: %s\n", p)
-
-	_, err := os.Stat(p)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return true, nil
-}
-
-func isOwnProjectPackage(path string) (bool, error) {
-	p := fmt.Sprintf("%s/src/%s", config.GetEnv().GetGoPath(), path)
-	//fmt.Printf("path: %s\n", p)
-
-	_, err := os.Stat(p)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return true, nil
 }

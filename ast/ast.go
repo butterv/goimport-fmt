@@ -3,7 +3,6 @@ package ast
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/istsh/goimport-fmt/config"
 )
@@ -25,80 +24,8 @@ type ImportDetail struct {
 	PackageType PackageType
 }
 
-func Analyze(strs []string) ([]*ImportDetail, error) {
-	var ids []*ImportDetail
-
-	if len(strs) == 0 {
-		return ids, nil
-	}
-
-	if len(strs) == 1 {
-		str := strs[0]
-		trimStr := strings.Trim(str, "import ")
-		replaceStr := strings.Replace(trimStr, "\"", "", -1)
-		splitStrs := strings.Split(replaceStr, " ")
-		return ids, nil
-	}
-
-	for _, str := range strs {
-		if str == "" {
-			continue
-		}
-
-		if str == "import (" || str == ")" {
-			ids = append(ids, &ImportDetail{
-				Alias:       NoAlias,
-				ImportStr:   str,
-				PackageType: Unknown,
-			})
-			continue
-		}
-
-		trimStr := strings.Trim(str, "\t")
-		replaceStr := strings.Replace(trimStr, "\"", "", -1)
-		splitStrs := strings.Split(replaceStr, " ")
-
-		if len(splitStrs) == 2 {
-			id, err := analyzeIncludeAlias(splitStrs[0], splitStrs[1])
-			if err != nil {
-				// TODO: error handling
-			}
-			ids = append(ids, id)
-		} else {
-			importStr := splitStrs[0]
-
-			id := &ImportDetail{
-				Alias:       NoAlias,
-				ImportStr:   importStr,
-				PackageType: Unknown,
-			}
-
-			isStandard, _ := isStandardPackage(importStr)
-			if isStandard {
-				id.PackageType = Standard
-			}
-
-			if id.PackageType == Unknown {
-				isOwnProject, _ := isOwnProjectPackage(importStr)
-				if isOwnProject {
-					id.PackageType = OwnProject
-				}
-			}
-
-			if id.PackageType == Unknown {
-				// StandardでもOwnProjectでもなければThirdPartyとする
-				id.PackageType = ThirdParty
-			}
-
-			ids = append(ids, id)
-		}
-	}
-
-	return ids, nil
-}
-
-func analyzeIncludeAlias(alias, importStr string) (*ImportDetail, error) {
-	id, err := analyze(importStr)
+func AnalyzeIncludeAlias(alias, importStr string) (*ImportDetail, error) {
+	id, err := Analyze(importStr)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +34,7 @@ func analyzeIncludeAlias(alias, importStr string) (*ImportDetail, error) {
 	return id, nil
 }
 
-func analyze(importStr string) (*ImportDetail, error) {
+func Analyze(importStr string) (*ImportDetail, error) {
 	packageType := Unknown
 
 	isStandard, err := isStandardPackage(importStr)
@@ -139,6 +66,7 @@ func analyze(importStr string) (*ImportDetail, error) {
 
 func isStandardPackage(path string) (bool, error) {
 	p := fmt.Sprintf("%s/src/%s", config.GetEnv().GetGoRoot(), path)
+	fmt.Printf("p: %s\n", p)
 
 	if _, err := os.Stat(p); err != nil {
 		if os.IsNotExist(err) {
@@ -151,7 +79,11 @@ func isStandardPackage(path string) (bool, error) {
 }
 
 func isOwnProjectPackage(path string) (bool, error) {
+	// TODO: ここをどう判定するか。できればmodulesの設定によって処理を分けたくない。
+
 	p := fmt.Sprintf("%s/src/%s", config.GetEnv().GetGoPath(), path)
+
+	fmt.Printf("p: %s\n", p)
 
 	if _, err := os.Stat(p); err != nil {
 		if os.IsNotExist(err) {

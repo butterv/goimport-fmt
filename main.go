@@ -4,11 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"os"
-	"strings"
 )
 
 // importは3種類
@@ -26,38 +22,6 @@ import (
 // - パスのみの記述
 // - エイリアスあり
 
-type PackageType string
-
-const (
-	Unknown    PackageType = "unknown"
-	Standard               = "standard"
-	ThirdParty             = "third party"
-	OwnProject             = "own project"
-)
-
-type Environment struct {
-	GOROOT      string
-	GOPATH      string
-	GO111MODULE string
-}
-
-var Env *Environment
-
-func init() {
-	goroot := os.Getenv("GOROOT")
-	fmt.Printf("goroot: %s\n", goroot)
-	gopath := os.Getenv("GOPATH")
-	fmt.Printf("gopath: %s\n", gopath)
-	go111module := os.Getenv("GO111MODULE")
-	fmt.Printf("go111module: %s\n", go111module)
-
-	Env = &Environment{
-		GOROOT:      goroot,
-		GOPATH:      gopath,
-		GO111MODULE: go111module,
-	}
-}
-
 func main() {
 	// 対象となるファイルのパス
 	pathPtr := flag.String("filepath", "", "file path")
@@ -67,8 +31,6 @@ func main() {
 	if path == "" {
 		panic("file path not found")
 	}
-
-	fmt.Printf("target file: %s\n", path)
 
 	// ファイルをOpenする
 	f, err := os.Open(path)
@@ -92,6 +54,9 @@ func main() {
 		// ここで一行ずつ処理
 		//fmt.Printf("L%d: %s\n", line, lineStr)
 
+		// TODO: importがない場合どうするか
+		// TODO: importが1つしかない場合は処理をスキップしたい
+
 		if !importFlag && lineStr == "import (" {
 			// import部分の読み込み開始
 			importFlag = true
@@ -112,142 +77,4 @@ func main() {
 	}
 
 	fmt.Printf("start: %d, end: %d\n", importStart, importEnd)
-
-	fmt.Println("## Before")
-
-	for _, path := range importLines {
-		fmt.Printf("%s\n", path)
-	}
-
-	fmt.Println("## After1")
-
-	fset := token.NewFileSet()
-	fp, err := parser.ParseFile(fset, path, nil, parser.Mode(0))
-	if err != nil {
-		panic(err.Error())
-	}
-
-	for _, d := range fp.Imports {
-		//ast.Print(fset, d)
-		p := strings.Replace(d.Path.Value, "\"", "", -1)
-
-		var packageTyape = Unknown
-
-		{
-			isStandard, err := isStandardPackage(p)
-			if err != nil {
-				fmt.Printf("err: %s\n", err.Error())
-			}
-			if isStandard {
-				packageTyape = Standard
-			}
-		}
-
-		if packageTyape == Unknown {
-			isOwnProject, err := isOwnProjectPackage(p)
-			if err != nil {
-				fmt.Printf("err: %s\n", err.Error())
-			}
-			if isOwnProject {
-				packageTyape = OwnProject
-			}
-		}
-
-		if packageTyape == Unknown {
-			// StandardでもOwnProjectでもなければThirdPartyとする
-			packageTyape = ThirdParty
-		}
-
-		fmt.Printf("%s(%s)\n", p, packageTyape)
-	}
-
-	fmt.Println()
-	fmt.Println("## After2")
-
-	fset2 := token.NewFileSet()
-	fp2, err := parser.ParseFile(fset2, path, nil, parser.Mode(0))
-	if err != nil {
-		panic(err.Error())
-	}
-	ast.SortImports(fset2, fp2)
-	fp3, err := parser.ParseFile(fset2, path, nil, parser.Mode(0))
-	if err != nil {
-		panic(err.Error())
-	}
-	for _, d := range fp3.Imports {
-
-		var packageTyape = Unknown
-
-		{
-			isStandard, err := isStandardPackage(d.Path.Value)
-			if err != nil {
-				fmt.Printf("err: %s\n", err.Error())
-			}
-			if isStandard {
-				packageTyape = Standard
-			}
-		}
-
-		if packageTyape == Unknown {
-			isOwnProject, err := isOwnProjectPackage(d.Path.Value)
-			if err != nil {
-				fmt.Printf("err: %s\n", err.Error())
-			}
-			if isOwnProject {
-				packageTyape = OwnProject
-			}
-		}
-
-		if packageTyape == Unknown {
-			// StandardでもOwnProjectでもなければThirdPartyとする
-			packageTyape = ThirdParty
-		}
-
-		fmt.Printf("%s(%s)\n", d.Path.Value, packageTyape)
-	}
-}
-
-func isStandardPackage(path string) (bool, error) {
-	p := fmt.Sprintf("%s/src/%s", Env.GOROOT, path)
-	//fmt.Printf("path: %s\n", p)
-
-	_, err := os.Stat(p)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return true, nil
-}
-
-func isThirdPartyPackage(path string) (bool, error) {
-	p := fmt.Sprintf("%s/pkg/mod/%s", Env.GOPATH, path)
-	//fmt.Printf("path: %s\n", p)
-
-	_, err := os.Stat(p)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return true, nil
-}
-
-func isOwnProjectPackage(path string) (bool, error) {
-	p := fmt.Sprintf("%s/src/%s", Env.GOPATH, path)
-	//fmt.Printf("path: %s\n", p)
-
-	_, err := os.Stat(p)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return true, nil
 }
