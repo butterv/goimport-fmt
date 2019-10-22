@@ -1,16 +1,16 @@
 package lexer
 
 type Lexer struct {
-	input     string
+	strs      []string
 	startLine int
 	endLine   int
 	//curLineNum  int
 	//nextLineNum int
 }
 
-func New(input string) *Lexer {
+func New(strs []string) *Lexer {
 	l := &Lexer{
-		input: input,
+		strs: strs,
 	}
 	return l
 }
