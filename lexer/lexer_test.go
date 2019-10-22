@@ -165,17 +165,16 @@ func Test1(t *testing.T) {
 			continue
 		}
 
-		replacedStr := strings.Replace(importStr, "\"", "", -1)
+		replacedStr := strings.Replace(strings.Trim(importStr, "\t"), "\"", "", -1)
 		fmt.Printf("%s\n", replacedStr)
 
-		splitedStr := strings.Split(replacedStr, "\t")[1]
-		splitedStrs := strings.Split(splitedStr, " ")
+		splitedStrs := strings.Split(replacedStr, " ")
 
 		if len(splitedStrs) == 2 {
 			id.Alias = splitedStrs[0]
 
 			str := splitedStrs[1]
-			id.ImportStr = strings.Replace(str, " ", "", -1)
+			id.ImportStr = str
 
 			isStandard, _ := isStandardPackage(str)
 			if isStandard {
