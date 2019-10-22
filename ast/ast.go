@@ -28,11 +28,21 @@ type ImportDetail struct {
 func Analyze(strs []string) ([]*ImportDetail, error) {
 	var ids []*ImportDetail
 
-	for _, str := range strs {
-		// ここからが実装
+	if len(strs) == 0 {
+		return ids, nil
+	}
 
-		id := &ImportDetail{
-			PackageType: Unknown,
+	if len(strs) == 1 {
+		str := strs[0]
+		trimStr := strings.Trim(str, "import ")
+		replaceStr := strings.Replace(trimStr, "\"", "", -1)
+		splitStrs := strings.Split(replaceStr, " ")
+		return ids, nil
+	}
+
+	for _, str := range strs {
+		if str == "" {
+			continue
 		}
 
 		if str == "import (" || str == ")" {
@@ -43,49 +53,33 @@ func Analyze(strs []string) ([]*ImportDetail, error) {
 			})
 			continue
 		}
-		if str == "" {
-			continue
-		}
 
-		replacedStr := strings.Replace(str, "\"", "", -1)
-		//fmt.Printf("%s\n", replacedStr)
+		trimStr := strings.Trim(str, "\t")
+		replaceStr := strings.Replace(trimStr, "\"", "", -1)
+		splitStrs := strings.Split(replaceStr, " ")
 
-		splitedStr := strings.Split(replacedStr, "\t")[1]
-		splitedStrs := strings.Split(splitedStr, " ")
-
-		if len(splitedStrs) == 2 {
-			id.Alias = splitedStrs[0]
-
-			str := splitedStrs[1]
-			id.ImportStr = strings.Replace(str, " ", "", -1)
-
-			isStandard, _ := isStandardPackage(str)
-			if isStandard {
-				id.PackageType = Standard
+		if len(splitStrs) == 2 {
+			id, err := analyzeIncludeAlias(splitStrs[0], splitStrs[1])
+			if err != nil {
+				// TODO: error handling
 			}
-
-			if id.PackageType == Unknown {
-				isOwnProject, _ := isOwnProjectPackage(str)
-				if isOwnProject {
-					id.PackageType = OwnProject
-				}
-			}
-
-			if id.PackageType == Unknown {
-				// StandardでもOwnProjectでもなければThirdPartyとする
-				id.PackageType = ThirdParty
-			}
+			ids = append(ids, id)
 		} else {
-			id.Alias = "<no alias>"
-			id.ImportStr = splitedStrs[0]
+			importStr := splitStrs[0]
 
-			isStandard, _ := isStandardPackage(splitedStrs[0])
+			id := &ImportDetail{
+				Alias:       NoAlias,
+				ImportStr:   importStr,
+				PackageType: Unknown,
+			}
+
+			isStandard, _ := isStandardPackage(importStr)
 			if isStandard {
 				id.PackageType = Standard
 			}
 
 			if id.PackageType == Unknown {
-				isOwnProject, _ := isOwnProjectPackage(splitedStrs[0])
+				isOwnProject, _ := isOwnProjectPackage(importStr)
 				if isOwnProject {
 					id.PackageType = OwnProject
 				}
@@ -95,12 +89,52 @@ func Analyze(strs []string) ([]*ImportDetail, error) {
 				// StandardでもOwnProjectでもなければThirdPartyとする
 				id.PackageType = ThirdParty
 			}
-		}
 
-		fmt.Printf("\t{\n\t\tImportStr:   %s,\n\t\tAlias:       %s, \n\t\tPackageType: %s,\n\t},\n", id.ImportStr, id.Alias, id.PackageType)
+			ids = append(ids, id)
+		}
 	}
 
-	return nil, nil
+	return ids, nil
+}
+
+func analyzeIncludeAlias(alias, importStr string) (*ImportDetail, error) {
+	id, err := analyze(importStr)
+	if err != nil {
+		return nil, err
+	}
+
+	id.Alias = alias
+	return id, nil
+}
+
+func analyze(importStr string) (*ImportDetail, error) {
+	packageType := Unknown
+
+	isStandard, err := isStandardPackage(importStr)
+	if err != nil {
+		return nil, err
+	}
+	if isStandard {
+		packageType = Standard
+	}
+
+	if packageType == Unknown {
+		isOwnProject, _ := isOwnProjectPackage(importStr)
+		if isOwnProject {
+			packageType = OwnProject
+		}
+	}
+
+	if packageType == Unknown {
+		// StandardでもOwnProjectでもなければThirdPartyとする
+		packageType = ThirdParty
+	}
+
+	return &ImportDetail{
+		Alias:       NoAlias,
+		ImportStr:   importStr,
+		PackageType: Unknown,
+	}, nil
 }
 
 func isStandardPackage(path string) (bool, error) {
