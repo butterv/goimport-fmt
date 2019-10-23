@@ -3,17 +3,18 @@ package ast
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/istsh/goimport-fmt/config"
 )
 
-type PackageType string
+type PackageType uint
 
 const (
-	Unknown    PackageType = "unknown"
-	Standard               = "standard"
-	ThirdParty             = "third party"
-	OwnProject             = "own project"
+	Unknown PackageType = iota
+	Standard
+	ThirdParty
+	OwnProject
 )
 
 const NoAlias = "<no alias>"
@@ -46,7 +47,7 @@ func Analyze(importStr string) (*ImportDetail, error) {
 	}
 
 	if packageType == Unknown {
-		isOwnProject, _ := isOwnProjectPackage(importStr)
+		isOwnProject := isOwnProjectPackage(importStr)
 		if isOwnProject {
 			packageType = OwnProject
 		}
@@ -60,13 +61,12 @@ func Analyze(importStr string) (*ImportDetail, error) {
 	return &ImportDetail{
 		Alias:       NoAlias,
 		ImportStr:   importStr,
-		PackageType: Unknown,
+		PackageType: packageType,
 	}, nil
 }
 
 func isStandardPackage(path string) (bool, error) {
 	p := fmt.Sprintf("%s/src/%s", config.GetEnv().GetGoRoot(), path)
-	fmt.Printf("p: %s\n", p)
 
 	if _, err := os.Stat(p); err != nil {
 		if os.IsNotExist(err) {
@@ -78,19 +78,26 @@ func isStandardPackage(path string) (bool, error) {
 	return true, nil
 }
 
-func isOwnProjectPackage(path string) (bool, error) {
-	// TODO: ここをどう判定するか。できればmodulesの設定によって処理を分けたくない。
+func isOwnProjectPackage(path string) bool {
+	return strings.HasPrefix(path, config.GetEnv().GetOwnProject())
+}
 
-	p := fmt.Sprintf("%s/src/%s", config.GetEnv().GetGoPath(), path)
+type ImportDetails []*ImportDetail
 
-	fmt.Printf("p: %s\n", p)
+func (ids ImportDetails) Len() int {
+	return len(ids)
+}
 
-	if _, err := os.Stat(p); err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
+func (ids ImportDetails) Less(i, j int) bool {
+	if ids[i].PackageType < ids[j].PackageType {
+		return true
 	}
+	if ids[i].PackageType > ids[j].PackageType {
+		return false
+	}
+	return ids[i].ImportStr < ids[j].ImportStr
+}
 
-	return true, nil
+func (ids ImportDetails) Swap(i, j int) {
+	ids[i], ids[j] = ids[j], ids[i]
 }
