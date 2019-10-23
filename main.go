@@ -5,6 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
+	"sort"
+
+	"github.com/istsh/goimport-fmt/ast"
+
+	"github.com/istsh/goimport-fmt/config"
+	"github.com/istsh/goimport-fmt/lexer"
 )
 
 // importは3種類
@@ -22,18 +29,36 @@ import (
 // - パスのみの記述
 // - エイリアスあり
 
+type importStatus uint
+
+const (
+	NotYetReached importStatus = iota
+	UnderAnalysis
+	Finished
+)
+
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	// 対象となるファイルのパス
-	pathPtr := flag.String("filepath", "", "file path")
+	filePathPtr := flag.String("filepath", "", "file path")
+	ownProjectPtr := flag.String("ownproject", "", "own project")
 	flag.Parse()
 
-	path := *pathPtr
-	if path == "" {
+	filePath := *filePathPtr
+	if filePath == "" {
 		panic("file path not found")
 	}
 
+	ownProject := *ownProjectPtr
+	if ownProject == "" {
+		panic("own project not found")
+	}
+
+	config.Setup(ownProject)
+
 	// ファイルをOpenする
-	f, err := os.Open(path)
+	f, err := os.OpenFile(filePath, os.O_RDONLY, 0666)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -41,40 +66,84 @@ func main() {
 
 	scanner := bufio.NewScanner(f)
 
-	// 行数
-	var line, importStart, importEnd uint
 	// importの各行
 	var importLines []string
 	// import開始フラグ
-	var importFlag bool
+	importStatus := NotYetReached
+
+	var beforeBlock []string
+	var afterBlock []string
 	for scanner.Scan() {
-		line++
 		// その行の内容
 		lineStr := scanner.Text()
-		// ここで一行ずつ処理
-		//fmt.Printf("L%d: %s\n", line, lineStr)
 
-		// TODO: importがない場合どうするか
-		// TODO: importが1つしかない場合は処理をスキップしたい
-
-		if !importFlag && lineStr == "import (" {
-			// import部分の読み込み開始
-			importFlag = true
-			importStart = line
+		if importStatus == NotYetReached && lineStr != "import (" {
+			beforeBlock = append(beforeBlock, lineStr)
+			continue
 		}
 
-		if importFlag {
+		if importStatus == NotYetReached && lineStr == "import (" {
+			// import部分の読み込み開始
+			importStatus = UnderAnalysis
+			continue
+		}
+
+		if importStatus == UnderAnalysis && lineStr == ")" {
+			// import部分の読み込み終了
+			importStatus = Finished
+			continue
+		}
+
+		if importStatus == UnderAnalysis && lineStr != "" {
 			// 対象行の内容を格納
 			importLines = append(importLines, lineStr)
+			continue
 		}
 
-		if importFlag && lineStr == ")" {
-			// import部分の読み込み終了
-			importFlag = false
-			importEnd = line
-			break
+		if importStatus == Finished {
+			afterBlock = append(afterBlock, lineStr)
+			continue
 		}
 	}
 
-	fmt.Printf("start: %d, end: %d\n", importStart, importEnd)
+	if len(importLines) <= 1 {
+		return
+	}
+
+	ids, err := lexer.Lexer(importLines)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	nf, err := os.Create(filePath)
+	if err != nil {
+		panic(err.Error())
+	}
+	defer nf.Close()
+	for _, text := range beforeBlock {
+		fmt.Fprintln(nf, text)
+	}
+	fmt.Fprintln(nf, "import (")
+
+	sort.Sort(ast.ImportDetails(ids))
+	beforePackageType := ast.Unknown
+	for _, id := range ids {
+		if beforePackageType != ast.Unknown && beforePackageType != id.PackageType {
+			fmt.Fprintln(nf)
+		}
+
+		beforePackageType = id.PackageType
+		if id.Alias == ast.NoAlias {
+			fmt.Fprintf(nf, "\t\"%s\"\n", id.ImportStr)
+		} else {
+			fmt.Fprintf(nf, "\t%s \"%s\"\n", id.Alias, id.ImportStr)
+		}
+	}
+	fmt.Fprintln(nf, ")")
+
+	for _, text := range afterBlock {
+		fmt.Fprintln(nf, text)
+	}
+
+	os.Exit(0)
 }
