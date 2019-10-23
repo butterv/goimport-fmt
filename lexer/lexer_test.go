@@ -1,159 +1,107 @@
 package lexer
 
 import (
-	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/istsh/goimport-fmt/ast"
+	"github.com/istsh/goimport-fmt/config"
 )
-
-type PackageType string
-
-const (
-	Unknown    PackageType = "unknown"
-	Standard               = "standard"
-	ThirdParty             = "third party"
-	OwnProject             = "own project"
-)
-
-type ImportDetail struct {
-	Alias       string
-	ImportStr   string
-	PackageType PackageType
-}
-
-//type Environment struct {
-//	GOROOT      string
-//	GOPATH      string
-//	GO111MODULE string
-//}
-//
-//var Env *Environment
-//
-//func setup() {
-//	goroot := os.Getenv("GOROOT")
-//	gopath := os.Getenv("GOPATH")
-//	go111module := os.Getenv("GO111MODULE")
-//
-//	Env = &Environment{
-//		GOROOT:      goroot,
-//		GOPATH:      gopath,
-//		GO111MODULE: go111module,
-//	}
-//}
 
 func Test1(t *testing.T) {
-	input := `import (
-	"context"
-	"math/rand"
-	"net/http"
-	"time"
-
-	"github.com/go-sql-driver/mysql"
-	"github.com/jinzhu/gorm"
-	"github.com/labstack/echo"
-	sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"
-	gormtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/jinzhu/gorm"
-
-	"github.com/istsh/own-project/app/impl/userserviceimpl"
-	"github.com/istsh/own-project/app/impl/todoserviceimpl"
-	"github.com/istsh/own-project/app/impl/repository/database"
-	imiddleware "github.com/istsh/own-project/app/middleware"
-)`
-
-	//tests := []ImportDetail{
-	//	{
-	//		ImportStr:   "context",
-	//		Alias:       "<no alias>",
-	//		PackageType: Standard,
-	//	},
-	//	{
-	//		ImportStr:   "math/rand",
-	//		Alias:       "<no alias>",
-	//		PackageType: Standard,
-	//	},
-	//	{
-	//		ImportStr:   "net/http",
-	//		Alias:       "<no alias>",
-	//		PackageType: Standard,
-	//	},
-	//	{
-	//		ImportStr:   "time",
-	//		Alias:       "<no alias>",
-	//		PackageType: Standard,
-	//	},
-	//	{
-	//		ImportStr:   "github.com/go-sql-driver/mysql",
-	//		Alias:       "<no alias>",
-	//		PackageType: ThirdParty,
-	//	},
-	//	{
-	//		ImportStr:   "github.com/jinzhu/gorm",
-	//		Alias:       "<no alias>",
-	//		PackageType: ThirdParty,
-	//	},
-	//	{
-	//		ImportStr:   "github.com/labstack/echo",
-	//		Alias:       "<no alias>",
-	//		PackageType: ThirdParty,
-	//	},
-	//	{
-	//		ImportStr:   "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql",
-	//		Alias:       "sqltrace",
-	//		PackageType: ThirdParty,
-	//	},
-	//	{
-	//		ImportStr:   "gopkg.in/DataDog/dd-trace-go.v1/contrib/jinzhu/gorm",
-	//		Alias:       "gormtrace",
-	//		PackageType: ThirdParty,
-	//	},
-	//	{
-	//		ImportStr:   "github.com/istsh/own-project/app/impl/userserviceimpl",
-	//		Alias:       "<no alias>",
-	//		PackageType: OwnProject,
-	//	},
-	//	{
-	//		ImportStr:   "github.com/istsh/own-project/app/impl/todoserviceimpl",
-	//		Alias:       "<no alias>",
-	//		PackageType: OwnProject,
-	//	},
-	//	{
-	//		ImportStr:   "github.com/istsh/own-project/app/impl/repository/database",
-	//		Alias:       "<no alias>",
-	//		PackageType: OwnProject,
-	//	},
-	//	{
-	//		ImportStr:   "github.com/istsh/own-project/app/middleware",
-	//		Alias:       "imiddleware",
-	//		PackageType: OwnProject,
-	//	},
-	//}
-
-	// l := New(input)
-
-	// replacedStr := strings.Replace(input, "\"", "", -1)
-	// fmt.Printf(replacedStr)
-
-	//config.Setup()
-
-	var strs []string
-	for _, str := range strings.Split(input, "\n") {
-		strs = append(strs, str)
+	tests := []*ast.ImportDetail{
+		{
+			ast.NoAlias,
+			"context",
+			ast.Standard,
+		},
+		{
+			ast.NoAlias,
+			"math/rand",
+			ast.Standard,
+		},
+		{
+			ast.NoAlias,
+			"net/http",
+			ast.Standard,
+		},
+		{
+			ast.NoAlias,
+			"time",
+			ast.Standard,
+		},
+		{
+			ast.NoAlias,
+			"github.com/go-sql-driver/mysql",
+			ast.ThirdParty,
+		},
+		{
+			ast.NoAlias,
+			"github.com/jinzhu/gorm",
+			ast.ThirdParty,
+		},
+		{
+			ast.NoAlias,
+			"github.com/labstack/echo",
+			ast.ThirdParty,
+		},
+		{
+			"sqltrace",
+			`sqltrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/database/sql"`,
+			ast.ThirdParty,
+		},
+		{
+			"gormtrace",
+			`gormtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/jinzhu/gorm"`,
+			ast.ThirdParty,
+		},
+		{
+			ast.NoAlias,
+			"github.com/istsh/own-project/app/impl/userserviceimpl",
+			ast.OwnProject,
+		},
+		{
+			ast.NoAlias,
+			"github.com/istsh/own-project/app/impl/todoserviceimpl",
+			ast.OwnProject,
+		},
+		{
+			ast.NoAlias,
+			"github.com/istsh/own-project/app/impl/repository/database",
+			ast.OwnProject,
+		},
+		{
+			"imiddleware",
+			`imiddleware "github.com/istsh/own-project/app/middleware"`,
+			ast.OwnProject,
+		},
 	}
 
-	if len(strs) == 1 {
-		return
+	config.Setup("github.com/istsh/own-project")
+
+	var paths []string
+	for _, tt := range tests {
+		paths = append(paths, tt.ImportStr)
 	}
 
-	ids, err := ast.Analyze(strs)
-	if err != nil {
-		// TODO: error handling
-	}
+	ids, _ := Lexer(paths)
+	for i, tt := range tests {
+		id := ids[i]
 
-	fmt.Println("{")
-	for _, id := range ids {
-		fmt.Printf("\t{\n\t\tImportStr:   %s,\n\t\tAlias:       %s, \n\t\tPackageType: %s,\n\t},\n", id.ImportStr, id.Alias, id.PackageType)
+		if tt.Alias != ast.NoAlias {
+			replaceStr := strings.Replace(tt.ImportStr, "\"", "", -1)
+			splitStrs := strings.Split(replaceStr, " ")
+			want := ast.ImportDetail{
+				Alias:       tt.Alias,
+				ImportStr:   splitStrs[1],
+				PackageType: tt.PackageType,
+			}
+			if !reflect.DeepEqual(*id, want) {
+				t.Errorf("Lexer(paths)\nindex:%d\ngot:  %#v\nwant: %#v", i, *id, want)
+			}
+		} else if !reflect.DeepEqual(*id, *tt) {
+			t.Errorf("Lexer(paths)\nindex:%d\ngot:  %#v\nwant: %#v", i, *id, *tt)
+		}
 	}
-	fmt.Println("}")
 }
