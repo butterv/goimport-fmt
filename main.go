@@ -2,15 +2,15 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"os"
 	"runtime"
 	"sort"
 
+	"github.com/istsh/goimport-fmt/config"
+
 	"github.com/istsh/goimport-fmt/ast"
 
-	"github.com/istsh/goimport-fmt/config"
 	"github.com/istsh/goimport-fmt/lexer"
 )
 
@@ -58,24 +58,8 @@ func main() {
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	// 対象となるファイルのパス
-	filePathPtr := flag.String("filepath", "", "file path")
-	ownProjectPtr := flag.String("ownproject", "", "own project")
-	flag.Parse()
-
-	filePath := *filePathPtr
-	if filePath == "" {
-		panic("file path not found")
-	}
-
-	ownProject := *ownProjectPtr
-	if ownProject == "" {
-		panic("own project not found")
-	}
-
-	config.Setup(ownProject)
-
 	// ファイルをOpenする
+	filePath := config.GetEnv().GetFilePath()
 	f, err := os.OpenFile(filePath, os.O_RDONLY, 0666)
 	if err != nil {
 		panic(err.Error())
