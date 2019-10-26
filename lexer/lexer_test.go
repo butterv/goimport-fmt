@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/istsh/goimport-fmt/ast"
-	"github.com/istsh/goimport-fmt/config"
 )
 
 func Test1(t *testing.T) {
@@ -78,14 +77,14 @@ func Test1(t *testing.T) {
 		},
 	}
 
-	config.Setup("github.com/istsh/own-project")
+	//config.Setup("github.com/istsh/own-project")
 
 	var paths []string
 	for _, tt := range tests {
 		paths = append(paths, tt.ImportStr)
 	}
 
-	ids, _ := Lexer(paths)
+	ids, _ := Lexer(nil)
 	for i, tt := range tests {
 		id := ids[i]
 
