@@ -1,16 +1,10 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
+	"io/ioutil"
 	"os"
-	"runtime"
-	"sort"
 
 	"github.com/istsh/goimport-fmt/config"
-
-	"github.com/istsh/goimport-fmt/ast"
-
 	"github.com/istsh/goimport-fmt/lexer"
 )
 
@@ -28,6 +22,7 @@ import (
 // import文のパターン
 // - パスのみの記述
 // - エイリアスあり
+// - コメントあり
 
 type importStatus uint
 
@@ -37,13 +32,20 @@ const (
 	Finished
 )
 
+type codeDivision struct {
+	tempSrc []byte
+
+	beforeImportDivision []byte
+	importDivision       []byte
+	afterImportDivision  []byte
+}
+
 // 標準パッケージのgofmtの実装を参考にする。
 // goimportsは関係なさそう。
 // gofmtはimportエリアのソートはやっているが、標準パッケージとそれ以外で区別している模様。
 // なのでサードパーティと自プロジェクトのパッケージをくっつけて記述すると空行が入らない。
 // また、空行を1行挟んで記述すると、全く別のパッケージ群と判定するようで、その無駄な空行は削除してくれない。
 func main() {
-	// そもそもmainパッケージである必要がないし、main.goである必要もない
 	// 標準パッケージのみで実装するからgo.modも不要。modulesをoffにしていいかも。
 
 	// 処理を分割して考える
@@ -56,96 +58,90 @@ func main() {
 	// 7. タイプ間に空行を入れる。
 	// 8. 分割して3つをファイルに書き込み、保存。
 
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
 	// ファイルをOpenする
 	filePath := config.GetEnv().GetFilePath()
+	// TODO: 権限確認
 	f, err := os.OpenFile(filePath, os.O_RDONLY, 0666)
 	if err != nil {
 		panic(err.Error())
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
+	src, err := ioutil.ReadAll(f)
+	if err != nil {
+		panic(err.Error())
+	}
 
-	// importの各行
-	var importLines []string
 	// import開始フラグ
 	importStatus := NotYetReached
 
-	var beforeBlock []string
-	var afterBlock []string
-	for scanner.Scan() {
-		// その行の内容
-		lineStr := scanner.Text()
+	// ファイルを読んでいく
+	codeDivision := codeDivision{}
+	for _, lineByte := range src {
+		codeDivision.tempSrc = append(codeDivision.tempSrc, lineByte)
+		if lineByte == '\n' {
+			lineStr := string(codeDivision.tempSrc)
+			switch importStatus {
+			case NotYetReached:
+				if lineStr == "import (\n" {
+					codeDivision.importDivision = append(codeDivision.importDivision, codeDivision.tempSrc...)
+					// import部分の読み込み開始
+					importStatus = UnderAnalysis
+				} else {
+					codeDivision.beforeImportDivision = append(codeDivision.beforeImportDivision, codeDivision.tempSrc...)
+				}
+			case UnderAnalysis:
+				codeDivision.importDivision = append(codeDivision.importDivision, codeDivision.tempSrc...)
+				if lineStr == ")\n" {
+					// import部分の読み込み終了
+					importStatus = Finished
+				}
+			case Finished:
+				codeDivision.afterImportDivision = append(codeDivision.afterImportDivision, codeDivision.tempSrc...)
+			}
 
-		if importStatus == NotYetReached && lineStr != "import (" {
-			beforeBlock = append(beforeBlock, lineStr)
-			continue
-		}
-
-		if importStatus == NotYetReached && lineStr == "import (" {
-			// import部分の読み込み開始
-			importStatus = UnderAnalysis
-			continue
-		}
-
-		if importStatus == UnderAnalysis && lineStr == ")" {
-			// import部分の読み込み終了
-			importStatus = Finished
-			continue
-		}
-
-		if importStatus == UnderAnalysis && lineStr != "" {
-			// 対象行の内容を格納
-			importLines = append(importLines, lineStr)
-			continue
-		}
-
-		if importStatus == Finished {
-			afterBlock = append(afterBlock, lineStr)
-			continue
+			codeDivision.tempSrc = nil
 		}
 	}
 
-	if len(importLines) <= 1 {
+	if len(codeDivision.importDivision) <= 1 {
 		return
 	}
 
-	ids, err := lexer.Lexer(importLines)
+	_, err = lexer.Lexer(codeDivision.importDivision)
 	if err != nil {
 		panic(err.Error())
 	}
-
-	nf, err := os.Create(filePath)
-	if err != nil {
-		panic(err.Error())
-	}
-	defer nf.Close()
-	for _, text := range beforeBlock {
-		fmt.Fprintln(nf, text)
-	}
-	fmt.Fprintln(nf, "import (")
-
-	sort.Sort(ast.ImportDetails(ids))
-	beforePackageType := ast.Unknown
-	for _, id := range ids {
-		if beforePackageType != ast.Unknown && beforePackageType != id.PackageType {
-			fmt.Fprintln(nf)
-		}
-
-		beforePackageType = id.PackageType
-		if id.Alias == ast.NoAlias {
-			fmt.Fprintf(nf, "\t\"%s\"\n", id.ImportStr)
-		} else {
-			fmt.Fprintf(nf, "\t%s \"%s\"\n", id.Alias, id.ImportStr)
-		}
-	}
-	fmt.Fprintln(nf, ")")
-
-	for _, text := range afterBlock {
-		fmt.Fprintln(nf, text)
-	}
+	//
+	//nf, err := os.Create(filePath)
+	//if err != nil {
+	//	panic(err.Error())
+	//}
+	//defer nf.Close()
+	//for _, text := range beforeBlock {
+	//	fmt.Fprintln(nf, text)
+	//}
+	//fmt.Fprintln(nf, "import (")
+	//
+	//sort.Sort(ast.ImportDetails(ids))
+	//beforePackageType := ast.Unknown
+	//for _, id := range ids {
+	//	if beforePackageType != ast.Unknown && beforePackageType != id.PackageType {
+	//		fmt.Fprintln(nf)
+	//	}
+	//
+	//	beforePackageType = id.PackageType
+	//	if id.Alias == ast.NoAlias {
+	//		fmt.Fprintf(nf, "\t\"%s\"\n", id.ImportStr)
+	//	} else {
+	//		fmt.Fprintf(nf, "\t%s \"%s\"\n", id.Alias, id.ImportStr)
+	//	}
+	//}
+	//fmt.Fprintln(nf, ")")
+	//
+	//for _, text := range afterBlock {
+	//	fmt.Fprintln(nf, text)
+	//}
 
 	os.Exit(0)
 }
