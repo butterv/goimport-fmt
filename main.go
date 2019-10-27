@@ -76,6 +76,7 @@ func main() {
 	importStatus := NotYetReached
 
 	// ファイルを読んでいく
+	// TODO: 1文字ずつ解析していく必要はないので、stringで比較してもいいかも、
 	codeDivision := codeDivision{}
 	for _, lineByte := range src {
 		codeDivision.tempSrc = append(codeDivision.tempSrc, lineByte)
