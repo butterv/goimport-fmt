@@ -49,7 +49,7 @@ func main() {
 	// ファイルをOpenする
 	filePath := config.GetEnv().GetFilePath()
 	// TODO: 権限確認
-	var perm os.FileMode = 0644
+	var perm os.FileMode = 0600
 	f, err := os.OpenFile(filePath, os.O_RDONLY, perm)
 	if err != nil {
 		panic(err.Error())
