@@ -19,25 +19,27 @@ $ goimport-fmt -filepath path/to/file.go -ownproject github.com/my-repository/my
 ```
 
 ## Example
-### Befor
+### Before
 ```go
 package main
 
 import (
 	"github.com/my-repository/my-project/log"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/pkg/errors"
+	"strconv"
 )
 
 func main() {
-	password := "12345678"
+	str := "12345678"
 	
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	i, err := strconv.ParseInt(str, 10, 64)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "parse failed"))
 	}
-	fmt.Printf("hash: %s\n", hash)
-	log.Infof("hash: %s\n", hash)
+	
+	fmt.Printf("str: %s, i: %d\n", str, i)
+	log.Infof("str: %s, i: %d\n", str, i)
 }
 ```
 
@@ -47,21 +49,23 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	
-	"golang.org/x/crypto/bcrypt"
+	"github.com/pkg/errors"
 	
 	"github.com/my-repository/my-project/log"
 )
 
 func main() {
-	password := "12345678"
+	str := "12345678"
 	
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	i, err := strconv.ParseInt(str, 10, 64)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "parse failed"))
 	}
-	fmt.Printf("hash: %s\n", hash)
-	log.Infof("hash: %s\n", hash)
+	
+	fmt.Printf("str: %s, i: %d\n", str, i)
+	log.Infof("str: %s, i: %d\n", str, i)
 }
 ```
 
