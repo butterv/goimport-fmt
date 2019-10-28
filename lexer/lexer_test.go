@@ -7,13 +7,11 @@ import (
 	"testing"
 
 	"github.com/istsh/goimport-fmt/ast"
-
 	"github.com/istsh/goimport-fmt/config"
 )
 
 func TestLexer_OnlyOneImport(t *testing.T) {
-	input := []byte(`
-package main
+	input := []byte(`package main
 
 import "fmt"
 
@@ -41,19 +39,36 @@ func main() {
 }
 
 func TestLexer_SomeImport(t *testing.T) {
+	input := []byte(`package main
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/jinzhu/gorm"
+
+	"github.com/istsh/goimport-fmt/ast"
+	c "github.com/istsh/goimport-fmt/config"
+)
+
+func main() {
+	strs := strings.Split("Hello World", " ")
+	fmt.Println(strs[0])
+	fmt.Println(strs[1])
+}
+`)
+
 	beforeBlock := []byte(`package main
 
 import (
 `)
 
 	importBlock := [][]byte{
-		[]byte("fmt\n"),
-		[]byte("strings\n"),
-		[]byte("\n"),
-		[]byte("github.com/jinzhu/gorm\n"),
-		[]byte("\n"),
-		[]byte("github.com/istsh/goimport-fmt/ast\n"),
-		[]byte("c \"github.com/istsh/goimport-fmt/config\"\n"),
+		[]byte("\t\"fmt\"\n"),
+		[]byte("\t\"strings\"\n"),
+		[]byte("\t\"github.com/jinzhu/gorm\"\n"),
+		[]byte("\t\"github.com/istsh/goimport-fmt/ast\"\n"),
+		[]byte("\tc \"github.com/istsh/goimport-fmt/config\"\n"),
 	}
 
 	afterBlock := []byte(`)
@@ -65,20 +80,9 @@ func main() {
 }
 `)
 
-	var input []byte
-	var wantImport [][]byte
-	input = append(input, beforeBlock...)
-	for _, block := range importBlock {
-		input = append(input, block...)
-		if !bytes.Equal(block, []byte("\n")) {
-			wantImport = append(wantImport, block)
-		}
-	}
-	input = append(input, afterBlock...)
-
 	want := &DividedSrc{
 		BeforeImportDivision: beforeBlock,
-		ImportDivision:       wantImport,
+		ImportDivision:       importBlock,
 		AfterImportDivision:  afterBlock,
 	}
 
@@ -96,22 +100,17 @@ func main() {
 }
 
 func TestGetImportDetails(t *testing.T) {
-	beforeBlock := []byte(`package main
+	input := []byte(`package main
 
 import (
-`)
+	"fmt"
+	"strings"
 
-	importBlock := [][]byte{
-		[]byte("fmt\n"),
-		[]byte("strings\n"),
-		[]byte("\n"),
-		[]byte("github.com/jinzhu/gorm\n"),
-		[]byte("\n"),
-		[]byte("github.com/istsh/goimport-fmt/ast\n"),
-		[]byte("c \"github.com/istsh/goimport-fmt/config\"\n"),
-	}
+	"github.com/jinzhu/gorm"
 
-	afterBlock := []byte(`)
+	"github.com/istsh/goimport-fmt/ast"
+	c "github.com/istsh/goimport-fmt/config"
+)
 
 func main() {
 	strs := strings.Split("Hello World", " ")
@@ -119,13 +118,6 @@ func main() {
 	fmt.Println(strs[1])
 }
 `)
-
-	var input []byte
-	input = append(input, beforeBlock...)
-	for _, block := range importBlock {
-		input = append(input, block...)
-	}
-	input = append(input, afterBlock...)
 
 	want := ast.ImportDetails{
 		&ast.ImportDetail{
@@ -164,8 +156,14 @@ func main() {
 	for i := 0; i < len(got); i++ {
 		g := got[i]
 		w := want[i]
-		if !reflect.DeepEqual(*g, *w) {
-			t.Errorf("GetImportDetails index: %d, g: %#v, w %#v", i, g, w)
+		if !bytes.Equal(g.Alias, w.Alias) {
+			t.Errorf("GetImportDetails Alias got: %s, want: %s\n", g.Alias, w.Alias)
+		}
+		if !bytes.Equal(g.ImportPath, w.ImportPath) {
+			t.Errorf("GetImportDetails ImportPath got: %s, want: %s\n", g.ImportPath, w.ImportPath)
+		}
+		if g.PackageType != w.PackageType {
+			t.Errorf("GetImportDetails PackageType got: %d, want: %d\n", g.PackageType, w.PackageType)
 		}
 	}
 }
