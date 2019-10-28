@@ -1,9 +1,9 @@
 package ast
 
 import (
+	"bytes"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/istsh/goimport-fmt/config"
 )
@@ -17,16 +17,14 @@ const (
 	OwnProject
 )
 
-const NoAlias = "<no alias>"
-
 type ImportDetail struct {
-	Alias       string
-	ImportStr   string
+	Alias       []byte
+	ImportPath  []byte
 	PackageType PackageType
 }
 
-func AnalyzeIncludeAlias(alias, importStr string) (*ImportDetail, error) {
-	id, err := Analyze(importStr)
+func AnalyzeIncludeAlias(alias, ImportPath []byte) (*ImportDetail, error) {
+	id, err := Analyze(ImportPath)
 	if err != nil {
 		return nil, err
 	}
@@ -35,10 +33,10 @@ func AnalyzeIncludeAlias(alias, importStr string) (*ImportDetail, error) {
 	return id, nil
 }
 
-func Analyze(importStr string) (*ImportDetail, error) {
+func Analyze(importPath []byte) (*ImportDetail, error) {
 	packageType := Unknown
 
-	isStandard, err := isStandardPackage(importStr)
+	isStandard, err := isStandardPackage(importPath)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +45,7 @@ func Analyze(importStr string) (*ImportDetail, error) {
 	}
 
 	if packageType == Unknown {
-		isOwnProject := isOwnProjectPackage(importStr)
+		isOwnProject := isOwnProjectPackage(importPath)
 		if isOwnProject {
 			packageType = OwnProject
 		}
@@ -59,14 +57,13 @@ func Analyze(importStr string) (*ImportDetail, error) {
 	}
 
 	return &ImportDetail{
-		Alias:       NoAlias,
-		ImportStr:   importStr,
+		ImportPath:  importPath,
 		PackageType: packageType,
 	}, nil
 }
 
-func isStandardPackage(path string) (bool, error) {
-	p := fmt.Sprintf("%s/src/%s", config.GetEnv().GetGoRoot(), path)
+func isStandardPackage(importPath []byte) (bool, error) {
+	p := fmt.Sprintf("%s/src/%s", config.GetEnv().GetGoRoot(), importPath)
 
 	if _, err := os.Stat(p); err != nil {
 		if os.IsNotExist(err) {
@@ -78,8 +75,8 @@ func isStandardPackage(path string) (bool, error) {
 	return true, nil
 }
 
-func isOwnProjectPackage(path string) bool {
-	return strings.HasPrefix(path, config.GetEnv().GetOwnProject())
+func isOwnProjectPackage(importPath []byte) bool {
+	return bytes.HasPrefix(importPath, []byte(config.GetEnv().GetOwnProject()))
 }
 
 type ImportDetails []*ImportDetail
@@ -95,7 +92,7 @@ func (ids ImportDetails) Less(i, j int) bool {
 	if ids[i].PackageType > ids[j].PackageType {
 		return false
 	}
-	return ids[i].ImportStr < ids[j].ImportStr
+	return bytes.Compare(ids[i].ImportPath, ids[j].ImportPath) < 0
 }
 
 func (ids ImportDetails) Swap(i, j int) {

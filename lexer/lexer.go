@@ -1,57 +1,90 @@
 package lexer
 
 import (
-	"fmt"
-	"strings"
+	"bytes"
 
 	"github.com/istsh/goimport-fmt/ast"
 )
 
-// TODO: []stringを引数にしたほうがいいかも。(1文字ずつ検証する必要がないから)
-func Lexer(paths []byte) ([]*ast.ImportDetail, error) {
-	var ids []*ast.ImportDetail
+type importStatus uint
 
-	var bs []byte
-	for _, path := range paths {
-		switch path {
-		case '\n':
-			fmt.Printf("%s\n", strings.TrimLeft(string(bs), "\t"))
-			bs = nil
-		case '(':
-			bs = append(bs, path)
-			fmt.Print("Undefined ")
-		case ')':
-			bs = append(bs, path)
-			fmt.Print("Undefined ")
-		default:
-			bs = append(bs, path)
+const (
+	NotYetReached importStatus = iota
+	UnderAnalysis
+	Finished
+)
+
+type DevidedSrc struct {
+	BeforeImportDivision []byte
+	ImportDivision       [][]byte
+	AfterImportDivision  []byte
+}
+
+func Lexer(src []byte) *DevidedSrc {
+	// import開始フラグ
+	importStatus := NotYetReached
+
+	// ファイルを読んでいく
+	var line []byte
+	ds := &DevidedSrc{}
+	for _, ch := range src {
+		line = append(line, ch)
+
+		if ch == '\n' {
+			switch importStatus {
+			case NotYetReached:
+				ds.BeforeImportDivision = append(ds.BeforeImportDivision, line...)
+				if bytes.Equal(line, []byte("import (\n")) {
+					// import部分の読み込み開始
+					importStatus = UnderAnalysis
+				}
+			case UnderAnalysis:
+				if bytes.Equal(line, []byte("\n")) {
+					// 空行はスキップ
+					break
+				}
+				if bytes.HasPrefix(line, []byte("\t//")) {
+					// コメントもスキップ
+					break
+				}
+				if bytes.Equal(line, []byte(")\n")) {
+					ds.AfterImportDivision = append(ds.AfterImportDivision, line...)
+					// import部分の読み込み終了
+					importStatus = Finished
+					break
+				}
+
+				ds.ImportDivision = append(ds.ImportDivision, line)
+			case Finished:
+				ds.AfterImportDivision = append(ds.AfterImportDivision, line...)
+			}
+
+			line = nil
+		}
+	}
+
+	return ds
+}
+
+func (ds *DevidedSrc) GetImportDetails() (ast.ImportDetails, error) {
+	var ids []*ast.ImportDetail
+	for _, importPath := range ds.ImportDivision {
+		trimBytes := bytes.TrimLeft(importPath, "\t")
+		trimBytes = bytes.TrimRight(trimBytes, "\n")
+		splitBytes := bytes.Split(bytes.ReplaceAll(trimBytes, []byte("\""), []byte("")), []byte(" "))
+
+		var id *ast.ImportDetail
+		var err error
+		if len(splitBytes) <= 1 {
+			id, err = ast.Analyze(splitBytes[0])
+		} else {
+			id, err = ast.AnalyzeIncludeAlias(splitBytes[0], splitBytes[1])
+		}
+		if err != nil {
+			return nil, err
 		}
 
-		str := "github.com/istsh/imnoo"
-		b := []byte(str)
-
-		//
-		//	//if path == "" || path == "\t" {
-		//	//	continue
-		//	//}
-		//	//
-		//	//trimStr := strings.Trim(path, "\t")
-		//	//replaceStr := strings.Replace(trimStr, "\"", "", -1)
-		//	//splitStrs := strings.Split(replaceStr, " ")
-		//	//
-		//	//if len(splitStrs) == 2 {
-		//	//	id, err := ast.AnalyzeIncludeAlias(splitStrs[0], splitStrs[1])
-		//	//	if err != nil {
-		//	//		return nil, err
-		//	//	}
-		//	//	ids = append(ids, id)
-		//	//} else {
-		//	//	id, err := ast.Analyze(splitStrs[0])
-		//	//	if err != nil {
-		//	//		return nil, err
-		//	//	}
-		//	//	ids = append(ids, id)
-		//	//}
+		ids = append(ids, id)
 	}
 
 	return ids, nil

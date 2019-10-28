@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
+
+	"github.com/istsh/goimport-fmt/ast"
 
 	"github.com/istsh/goimport-fmt/config"
 	"github.com/istsh/goimport-fmt/lexer"
@@ -23,22 +28,6 @@ import (
 // - パスのみの記述
 // - エイリアスあり
 // - コメントあり
-
-type importStatus uint
-
-const (
-	NotYetReached importStatus = iota
-	UnderAnalysis
-	Finished
-)
-
-type codeDivision struct {
-	tempSrc []byte
-
-	beforeImportDivision []byte
-	importDivision       []byte
-	afterImportDivision  []byte
-}
 
 // 標準パッケージのgofmtの実装を参考にする。
 // goimportsは関係なさそう。
@@ -61,7 +50,8 @@ func main() {
 	// ファイルをOpenする
 	filePath := config.GetEnv().GetFilePath()
 	// TODO: 権限確認
-	f, err := os.OpenFile(filePath, os.O_RDONLY, 0666)
+	var perm os.FileMode = 0644
+	f, err := os.OpenFile(filePath, os.O_RDONLY, perm)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -72,77 +62,75 @@ func main() {
 		panic(err.Error())
 	}
 
-	// import開始フラグ
-	importStatus := NotYetReached
-
-	// ファイルを読んでいく
-	// TODO: 1文字ずつ解析していく必要はないので、stringで比較してもいいかも、
-	codeDivision := codeDivision{}
-	for _, lineByte := range src {
-		codeDivision.tempSrc = append(codeDivision.tempSrc, lineByte)
-		if lineByte == '\n' {
-			lineStr := string(codeDivision.tempSrc)
-			switch importStatus {
-			case NotYetReached:
-				if lineStr == "import (\n" {
-					codeDivision.importDivision = append(codeDivision.importDivision, codeDivision.tempSrc...)
-					// import部分の読み込み開始
-					importStatus = UnderAnalysis
-				} else {
-					codeDivision.beforeImportDivision = append(codeDivision.beforeImportDivision, codeDivision.tempSrc...)
-				}
-			case UnderAnalysis:
-				codeDivision.importDivision = append(codeDivision.importDivision, codeDivision.tempSrc...)
-				if lineStr == ")\n" {
-					// import部分の読み込み終了
-					importStatus = Finished
-				}
-			case Finished:
-				codeDivision.afterImportDivision = append(codeDivision.afterImportDivision, codeDivision.tempSrc...)
-			}
-
-			codeDivision.tempSrc = nil
-		}
-	}
-
-	if len(codeDivision.importDivision) <= 1 {
-		return
-	}
-
-	_, err = lexer.Lexer(codeDivision.importDivision)
+	ds := lexer.Lexer(src)
+	res, err := createResult(ds)
 	if err != nil {
 		panic(err.Error())
 	}
-	//
-	//nf, err := os.Create(filePath)
-	//if err != nil {
-	//	panic(err.Error())
-	//}
-	//defer nf.Close()
-	//for _, text := range beforeBlock {
-	//	fmt.Fprintln(nf, text)
-	//}
-	//fmt.Fprintln(nf, "import (")
-	//
-	//sort.Sort(ast.ImportDetails(ids))
-	//beforePackageType := ast.Unknown
-	//for _, id := range ids {
-	//	if beforePackageType != ast.Unknown && beforePackageType != id.PackageType {
-	//		fmt.Fprintln(nf)
-	//	}
-	//
-	//	beforePackageType = id.PackageType
-	//	if id.Alias == ast.NoAlias {
-	//		fmt.Fprintf(nf, "\t\"%s\"\n", id.ImportStr)
-	//	} else {
-	//		fmt.Fprintf(nf, "\t%s \"%s\"\n", id.Alias, id.ImportStr)
-	//	}
-	//}
-	//fmt.Fprintln(nf, ")")
-	//
-	//for _, text := range afterBlock {
-	//	fmt.Fprintln(nf, text)
-	//}
+
+	if bytes.Equal(src, res) {
+		// No change
+		return
+	}
+
+	err = ioutil.WriteFile(filePath, res, perm)
+	if err != nil {
+		panic(err.Error())
+	}
 
 	os.Exit(0)
+}
+
+func createResult(ds *lexer.DevidedSrc) ([]byte, error) {
+	ids, err := ds.GetImportDetails()
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Sort(ids)
+
+	var res []byte
+	res = append(res, ds.BeforeImportDivision...)
+
+	createBytes := func(id *ast.ImportDetail) []byte {
+		var bs []byte
+		bs = append(bs, '\t')
+		if len(id.Alias) > 0 {
+			bs = append(bs, id.Alias...)
+			bs = append(bs, ' ')
+		}
+		bs = append(bs, '"')
+		bs = append(bs, id.ImportPath...)
+		bs = append(bs, '"')
+		bs = append(bs, '\n')
+		return bs
+	}
+
+	beforePackageType := ast.Unknown
+	for _, id := range ids {
+		switch id.PackageType {
+		case ast.Standard:
+			if beforePackageType == ast.Unknown {
+				beforePackageType = ast.Standard
+			}
+			res = append(res, createBytes(id)...)
+		case ast.ThirdParty:
+			if beforePackageType == ast.Standard {
+				beforePackageType = ast.ThirdParty
+				res = append(res, '\n')
+			}
+			res = append(res, createBytes(id)...)
+		case ast.OwnProject:
+			if beforePackageType == ast.ThirdParty {
+				beforePackageType = ast.OwnProject
+				res = append(res, '\n')
+			}
+			res = append(res, createBytes(id)...)
+		default:
+			return nil, fmt.Errorf("unsupported package type: %d", id.PackageType)
+		}
+	}
+
+	res = append(res, ds.AfterImportDivision...)
+	return res, nil
 }
