@@ -8,12 +8,17 @@ import (
 	"github.com/istsh/goimport-fmt/config"
 )
 
+// PackageType is type of import package
 type PackageType uint
 
 const (
+	// Unknown means an unknown definition
 	Unknown PackageType = iota
+	// Standard means a standard package
 	Standard
+	// ThirdParty means a third party package
 	ThirdParty
+	// OwnProject means a own project
 	OwnProject
 )
 

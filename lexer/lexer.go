@@ -21,7 +21,7 @@ type DevidedSrc struct {
 }
 
 func Lexer(src []byte) *DevidedSrc {
-	// import開始フラグ
+	// import status flag
 	importStatus := NotYetReached
 
 	// ファイルを読んでいく
