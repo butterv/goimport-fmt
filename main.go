@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,41 +13,32 @@ import (
 	"github.com/istsh/goimport-fmt/lexer"
 )
 
-// importは3種類
-// 1. 標準パッケージ
-// 2. サードパーティパッケージ
-// 3. 自プロジェクトパッケージ
-//
-// importのルール
-// - 種類毎にまとめて記述し、種類間は1行の空行を挟む
-// - 種類内ではパスで昇順ソート
-// - 1つしかない場合は丸括弧なし
-// - パスはダブルクォートで挟む
-//
-// import文のパターン
-// - パスのみの記述
-// - エイリアスあり
-// - コメントあり
+func setup() {
+	filePathPtr := flag.String("filepath", "", "file path")
+	ownProjectPtr := flag.String("ownproject", "", "own project")
+	flag.Parse()
 
-// 標準パッケージのgofmtの実装を参考にする。
-// goimportsは関係なさそう。
-// gofmtはimportエリアのソートはやっているが、標準パッケージとそれ以外で区別している模様。
-// なのでサードパーティと自プロジェクトのパッケージをくっつけて記述すると空行が入らない。
-// また、空行を1行挟んで記述すると、全く別のパッケージ群と判定するようで、その無駄な空行は削除してくれない。
+	filePath := *filePathPtr
+	if filePath == "" {
+		panic("file path not found")
+	}
+	ownProject := *ownProjectPtr
+	if ownProject == "" {
+		panic("own project not found")
+	}
+
+	goroot := os.Getenv("GOROOT")
+
+	config.Set(goroot, filePath, ownProject)
+}
+
+// The import path can be divided into three types.
+// 1. Standard package
+// 2. Third-party package
+// 3. Own project package
 func main() {
-	// 標準パッケージのみで実装するからgo.modも不要。modulesをoffにしていいかも。
-
-	// 処理を分割して考える
-	// 1. コマンド引数や環境変数の読み込みは、initでまとめて行う。
-	// 2. ファイルを開く
-	// 3. `1行目からimportの直前まで`,`import部`,`importの直後から最後まで`の3つに分割する。
-	// 4. import部を解析し、`標準パッケージ`,`サードパーティ`,`自プロジェクト`の情報を付与する。コメントも維持する。
-	// 5. 空行を全て除去
-	// 6. タイプ毎にソート
-	// 7. タイプ間に空行を入れる。
-	// 8. 分割して3つをファイルに書き込み、保存。
-
-	// ファイルをOpenする
+	setup()
+	// a target filepath
 	filePath := config.GetFilePath()
 	// permission: -rw-------(u=rw)
 	var perm os.FileMode = 0600

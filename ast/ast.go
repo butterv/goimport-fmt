@@ -60,7 +60,7 @@ func Analyze(importPath []byte) (*ImportDetail, error) {
 	}
 
 	if packageType == Unknown {
-		// StandardでもOwnProjectでもなければThirdPartyとする
+		// if it is neither Standard nor OwnProject, then ThirdParty
 		packageType = ThirdParty
 	}
 

@@ -29,7 +29,7 @@ func Lexer(src []byte) *DividedSrc {
 	// import status flag
 	importStatus := NotYetReached
 
-	// ファイルを読んでいく
+	// reading src...
 	var line []byte
 	ds := &DividedSrc{}
 	for _, ch := range src {
@@ -40,21 +40,21 @@ func Lexer(src []byte) *DividedSrc {
 			case NotYetReached:
 				ds.BeforeImportDivision = append(ds.BeforeImportDivision, line...)
 				if bytes.Equal(line, []byte("import (\n")) {
-					// import部分の読み込み開始
+					// start reading import block
 					importStatus = UnderAnalysis
 				}
 			case UnderAnalysis:
 				if bytes.Equal(line, []byte("\n")) {
-					// 空行はスキップ
+					// only line feed is skipped.
 					break
 				}
 				if bytes.HasPrefix(line, []byte("\t//")) {
-					// コメントもスキップ
+					// comment is skipped.
 					break
 				}
 				if bytes.Equal(line, []byte(")\n")) {
 					ds.AfterImportDivision = append(ds.AfterImportDivision, line...)
-					// import部分の読み込み終了
+					// finish reading import block
 					importStatus = Finished
 					break
 				}
