@@ -36,18 +36,17 @@ func init() {
 	}
 }
 
-func GetEnv() *environment {
-	return env
+// GetGoRoot gets a GOROOT
+func GetGoRoot() string {
+	return env.goroot
 }
 
-func (e *environment) GetGoRoot() string {
-	return e.goroot
+// GetFilePath gets a target file path
+func GetFilePath() string {
+	return env.filePath
 }
 
-func (e *environment) GetFilePath() string {
-	return e.filePath
-}
-
-func (e *environment) GetOwnProject() string {
-	return e.ownProject
+// GetOwnProject gets a own project
+func GetOwnProject() string {
+	return env.ownProject
 }

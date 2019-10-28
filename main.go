@@ -47,7 +47,7 @@ func main() {
 	// 8. 分割して3つをファイルに書き込み、保存。
 
 	// ファイルをOpenする
-	filePath := config.GetEnv().GetFilePath()
+	filePath := config.GetFilePath()
 	// permission: -rw-------(u=rw)
 	var perm os.FileMode = 0600
 	f, err := os.OpenFile(filePath, os.O_RDONLY, perm)
@@ -80,7 +80,7 @@ func main() {
 	os.Exit(0)
 }
 
-func createResult(ds *lexer.DevidedSrc) ([]byte, error) {
+func createResult(ds *lexer.DividedSrc) ([]byte, error) {
 	ids, err := ds.GetImportDetails()
 	if err != nil {
 		return nil, err

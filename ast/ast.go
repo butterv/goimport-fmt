@@ -22,12 +22,14 @@ const (
 	OwnProject
 )
 
+// ImportDetail ImportDetail has details of each import path
 type ImportDetail struct {
 	Alias       []byte
 	ImportPath  []byte
 	PackageType PackageType
 }
 
+// AnalyzeIncludeAlias evaluates import path and returns ImportDetail with alias
 func AnalyzeIncludeAlias(alias, ImportPath []byte) (*ImportDetail, error) {
 	id, err := Analyze(ImportPath)
 	if err != nil {
@@ -38,6 +40,7 @@ func AnalyzeIncludeAlias(alias, ImportPath []byte) (*ImportDetail, error) {
 	return id, nil
 }
 
+// Analyze evaluates import path and returns ImportDetail
 func Analyze(importPath []byte) (*ImportDetail, error) {
 	packageType := Unknown
 
@@ -68,7 +71,7 @@ func Analyze(importPath []byte) (*ImportDetail, error) {
 }
 
 func isStandardPackage(importPath []byte) (bool, error) {
-	p := fmt.Sprintf("%s/src/%s", config.GetEnv().GetGoRoot(), importPath)
+	p := fmt.Sprintf("%s/src/%s", config.GetGoRoot(), importPath)
 
 	if _, err := os.Stat(p); err != nil {
 		if os.IsNotExist(err) {
@@ -81,9 +84,10 @@ func isStandardPackage(importPath []byte) (bool, error) {
 }
 
 func isOwnProjectPackage(importPath []byte) bool {
-	return bytes.HasPrefix(importPath, []byte(config.GetEnv().GetOwnProject()))
+	return bytes.HasPrefix(importPath, []byte(config.GetOwnProject()))
 }
 
+// ImportDetails has some ImportDetail
 type ImportDetails []*ImportDetail
 
 func (ids ImportDetails) Len() int {

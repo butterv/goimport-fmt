@@ -9,24 +9,29 @@ import (
 type importStatus uint
 
 const (
+	// NotYetReached means that the import block has not yet been reached
 	NotYetReached importStatus = iota
+	// UnderAnalysis means that the import block is being analyzed
 	UnderAnalysis
+	// Finished means that the import block has been analyzed
 	Finished
 )
 
-type DevidedSrc struct {
+// DividedSrc has the result of dividing Src into before import block, import block, and after import block
+type DividedSrc struct {
 	BeforeImportDivision []byte
 	ImportDivision       [][]byte
 	AfterImportDivision  []byte
 }
 
-func Lexer(src []byte) *DevidedSrc {
+// Lexer analyzes and divides Src
+func Lexer(src []byte) *DividedSrc {
 	// import status flag
 	importStatus := NotYetReached
 
 	// ファイルを読んでいく
 	var line []byte
-	ds := &DevidedSrc{}
+	ds := &DividedSrc{}
 	for _, ch := range src {
 		line = append(line, ch)
 
@@ -66,7 +71,8 @@ func Lexer(src []byte) *DevidedSrc {
 	return ds
 }
 
-func (ds *DevidedSrc) GetImportDetails() (ast.ImportDetails, error) {
+// GetImportDetails evaluates import paths and returns ImportDetails
+func (ds *DividedSrc) GetImportDetails() (ast.ImportDetails, error) {
 	var ids []*ast.ImportDetail
 	for _, importPath := range ds.ImportDivision {
 		trimBytes := bytes.TrimLeft(importPath, "\t")
