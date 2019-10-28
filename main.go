@@ -8,7 +8,6 @@ import (
 	"sort"
 
 	"github.com/istsh/goimport-fmt/ast"
-
 	"github.com/istsh/goimport-fmt/config"
 	"github.com/istsh/goimport-fmt/lexer"
 )
